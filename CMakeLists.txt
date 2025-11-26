@@ -2,47 +2,60 @@ cmake_minimum_required(VERSION "3.12")
 
 project("spackexample" VERSION 0.3.0)
 
-find_package(Boost
-  1.65.1
-  REQUIRED
-  filesystem
-  )
+# Define options for dependencies
+option(USE_BOOST "Use Boost libraries" ON)
+option(USE_YAML "Use yaml-cpp libraries" ON)
 
-find_package(yaml-cpp
-  0.7.0
-  REQUIRED
-  )
+set(SRCS "")
+set(LIBS "")
+set(HDRS "")
 
-add_library(spackexamplelib filesystem/filesystem.cpp flatset/flatset.cpp yamlParser/yamlParser.cpp)
+# Handle Boost
+if(USE_BOOST)
+  find_package(Boost 1.65.1 REQUIRED filesystem)
+  list(APPEND SRCS filesystem/filesystem.cpp flatset/flatset.cpp)
+  list(APPEND HDRS filesystem/filesystem.hpp flatset/flatset.hpp)
+  list(APPEND LIBS Boost::filesystem)
+  add_compile_definitions(USE_BOOST)
+endif()
 
-set_target_properties(spackexamplelib
-  PROPERTIES
-    PUBLIC_HEADER filesystem/filesystem.hpp
-    PUBLIC_HEADER flatset/flatset.hpp
-    PUBLIC_HEADER yamlParser/yamlParser.hpp
-  )
+# Handle yaml-cpp
+if(USE_YAML)
+  find_package(yaml-cpp 0.7.0 REQUIRED)
+  list(APPEND SRCS yamlParser/yamlParser.cpp)
+  list(APPEND HDRS yamlParser/yamlParser.hpp)
+  list(APPEND LIBS yaml-cpp)
+  add_compile_definitions(USE_YAML)
+endif()
 
-include_directories(${YAML_CPP_INCLUDE_DIR})
-
+# Create the executable
 add_executable(spackexample main.cpp)
 
-target_link_libraries(spackexample spackexamplelib)
-target_link_libraries(spackexamplelib Boost::filesystem yaml-cpp)
-
-target_include_directories(spackexamplelib
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/spackexamplelib
+# Only create the library if we have sources (dependencies are enabled)
+if(SRCS)
+  add_library(spackexamplelib ${SRCS})
+  target_link_libraries(spackexamplelib ${LIBS})
+  
+  # Include directories
+  target_include_directories(spackexamplelib
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/spackexamplelib
     PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/spackexamplelib>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/spackexamplelib>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/spackexamplelib>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/spackexamplelib>
   )
+  
+  # Link the executable to the library
+  target_link_libraries(spackexample spackexamplelib)
+  
+  # Installation instructions for the library
+  include(GNUInstallDirs)
+  install(TARGETS spackexamplelib
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/spackexample
+  )
+endif()
 
-# Create install targets
+# Installation instructions for the executable
 include(GNUInstallDirs)
-install(TARGETS spackexample spackexamplelib
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/spackexample
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/spackexample
-  )
+install(TARGETS spackexample RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
